@@ -1,0 +1,7 @@
+.env
+sqlite3
+iwe.db
+documentation/createSertificats
+certs/openssl.cnf
+certs/server.crt
+certs/server.key
