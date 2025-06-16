@@ -9,7 +9,7 @@ import (
 )
 
 type MessageT struct {
-	TypeMessage   string // type of message - I, W, E
+	TypeMessage   string // type of message - I, W, E, T(test connect)
 	NameProject   string
 	LocationEvent string
 	BodyMessage   string
