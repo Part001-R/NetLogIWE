@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -20,13 +19,13 @@ import (
 
 type server struct {
 	pb.UnimplementedIweServer
-	db *sql.DB
+	db db.ActionsDB
 }
 
 func main() {
 
 	// Preparatory actions
-	ptrDB, closeDb, err := preparAct()
+	objDB, closeDb, err := preparAct()
 	if err != nil {
 		log.Fatalf("fault preparatory actions: %v", err)
 	}
@@ -36,11 +35,10 @@ func main() {
 			fmt.Println("fault close DB")
 		}
 	}()
-	_ = ptrDB
 
 	// gRPCS
 	srvImpl := &server{
-		db: ptrDB,
+		db: objDB,
 	}
 	err = startUpServer(srvImpl)
 	if err != nil {
@@ -62,7 +60,9 @@ func (s *server) SaveMessage(ctx context.Context, req *pb.MessageRequest) (*pb.M
 		return &pb.MessageResponse{Status: "Ok"}, nil
 	}
 
-	err := db.StoreMessage(s.db, msg)
+	err := s.db.StoreMessage(msg)
+
+	//err := db.StoreMessage(s.db, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (s *server) SaveMessage(ctx context.Context, req *pb.MessageRequest) (*pb.M
 }
 
 // preparatory actions. Returns: db pointer, function close db connect, error
-func preparAct() (*sql.DB, func() error, error) {
+func preparAct() (db.ActionsDB, func() error, error) {
 
 	// ENV
 	err := godotenv.Load(".env")
@@ -84,11 +84,14 @@ func preparAct() (*sql.DB, func() error, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("fault connect DB: %v", err)
 	}
-	err = db.Tables(ptrDb)
+	objDB := db.RepoDB(ptrDb)
+
+	// Tables
+	err = objDB.Tables()
 	if err != nil {
 		return nil, close, fmt.Errorf("fault create tables: %v", err)
 	}
-	return ptrDb, close, nil
+	return objDB, close, nil
 }
 
 // Start up IWE server. Return error.

@@ -15,6 +15,118 @@ type MessageT struct {
 	BodyMessage   string
 }
 
+type ObjectDB struct {
+	DB *sql.DB
+}
+
+type ActionsDB interface {
+	Tables() error
+	StoreMessage(msg MessageT) error
+}
+
+// Create the db object. Return interface.
+func RepoDB(db *sql.DB) ActionsDB {
+	return &ObjectDB{DB: db}
+}
+
+// Create tables
+func (o ObjectDB) Tables() error {
+
+	// main table
+	_, err := o.DB.Exec(`
+	CREATE TABLE IF NOT EXISTS main (
+	id INTEGER PRIMARY KEY,
+	nameTableI string UNIQUE,
+	nameTableW string UNIQUE,
+	nameTableE string UNIQUE,
+	timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
+	`)
+	if err != nil {
+		return fmt.Errorf("main table is not created: %v", err)
+	}
+
+	// log tables
+	row := o.DB.QueryRow("SELECT nameTableI, nameTableW, nameTableE FROM main WHERE id = 1")
+
+	var nameI, nameW, nameE string
+
+	err = row.Scan(&nameI, &nameW, &nameE)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+
+		nameI = "logI_1"
+		nameW = "logW_1"
+		nameE = "logE_1"
+		_, err := o.DB.Exec("INSERT INTO main (nameTableI, nameTableW, nameTableE) VALUES (?, ?, ?)", nameI, nameW, nameE)
+		if err != nil {
+			return fmt.Errorf("fault initialisation the main table: %v", err)
+		}
+	}
+
+	err = tableCheckCreate(o.DB, nameI)
+	if err != nil {
+		return fmt.Errorf("fault: {%v}", err)
+	}
+	err = tableCheckCreate(o.DB, nameW)
+	if err != nil {
+		return fmt.Errorf("fault: {%v}", err)
+	}
+	err = tableCheckCreate(o.DB, nameE)
+	if err != nil {
+		return fmt.Errorf("fault: {%v}", err)
+	}
+
+	return nil
+}
+
+// Saving the received message in the database. Return error
+func (o ObjectDB) StoreMessage(msg MessageT) error {
+
+	row := o.DB.QueryRow("SELECT nameTableI, nameTableW, nameTableE FROM main WHERE id = 1")
+
+	var nameI, nameW, nameE string
+
+	err := row.Scan(&nameI, &nameW, &nameE)
+	if err != nil {
+		return fmt.Errorf("store a information -> flt read main: %v", err)
+	}
+
+	// Saving
+	switch msg.TypeMessage {
+	case "I":
+		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameI)
+		_, err := o.DB.Exec(q,
+			sql.Named("project", msg.NameProject),
+			sql.Named("location", msg.LocationEvent),
+			sql.Named("body", msg.BodyMessage))
+		if err != nil {
+			return fmt.Errorf("store a information -> flt store I: %v", err)
+		}
+	case "W":
+		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameW)
+		_, err := o.DB.Exec(q,
+			sql.Named("project", msg.NameProject),
+			sql.Named("location", msg.LocationEvent),
+			sql.Named("body", msg.BodyMessage))
+		if err != nil {
+			return fmt.Errorf("store a information -> flt store W: %v", err)
+		}
+	case "E":
+		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameE)
+		_, err := o.DB.Exec(q,
+			sql.Named("project", msg.NameProject),
+			sql.Named("location", msg.LocationEvent),
+			sql.Named("body", msg.BodyMessage))
+		if err != nil {
+			return fmt.Errorf("store a information -> flt store E: %v", err)
+		}
+	default:
+		return errors.New("not allowed type of message")
+
+	}
+
+	return nil
+}
+
 // Connect DB
 func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
 
@@ -39,55 +151,6 @@ func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
 	return db, closeDB, nil
 }
 
-// Create tables
-func Tables(db *sql.DB) error {
-
-	// main table
-	_, err := db.Exec(`
-	CREATE TABLE IF NOT EXISTS main (
-	id INTEGER PRIMARY KEY,
-	nameTableI string UNIQUE,
-	nameTableW string UNIQUE,
-	nameTableE string UNIQUE,
-	timestamp TEXT DEFAULT CURRENT_TIMESTAMP);
-	`)
-	if err != nil {
-		return fmt.Errorf("main table is not created: %v", err)
-	}
-
-	// log tables
-	row := db.QueryRow("SELECT nameTableI, nameTableW, nameTableE FROM main WHERE id = 1")
-
-	var nameI, nameW, nameE string
-
-	err = row.Scan(&nameI, &nameW, &nameE)
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
-
-		nameI = "logI_1"
-		nameW = "logW_1"
-		nameE = "logE_1"
-		_, err := db.Exec("INSERT INTO main (nameTableI, nameTableW, nameTableE) VALUES (?, ?, ?)", nameI, nameW, nameE)
-		if err != nil {
-			return fmt.Errorf("fault initialisation the main table: %v", err)
-		}
-	}
-
-	err = tableCheckCreate(db, nameI)
-	if err != nil {
-		return fmt.Errorf("fault: {%v}", err)
-	}
-	err = tableCheckCreate(db, nameW)
-	if err != nil {
-		return fmt.Errorf("fault: {%v}", err)
-	}
-	err = tableCheckCreate(db, nameE)
-	if err != nil {
-		return fmt.Errorf("fault: {%v}", err)
-	}
-
-	return nil
-}
-
 // Check create table by name
 func tableCheckCreate(db *sql.DB, name string) error {
 
@@ -110,55 +173,6 @@ func tableCheckCreate(db *sql.DB, name string) error {
 	_, err := db.Exec(q)
 	if err != nil {
 		return fmt.Errorf("table {%s} is not created: %v", name, err)
-	}
-
-	return nil
-}
-
-// Saving the received message in the database. Return error
-func StoreMessage(db *sql.DB, msg MessageT) error {
-
-	row := db.QueryRow("SELECT nameTableI, nameTableW, nameTableE FROM main WHERE id = 1")
-
-	var nameI, nameW, nameE string
-
-	err := row.Scan(&nameI, &nameW, &nameE)
-	if err != nil {
-		return fmt.Errorf("store a information -> flt read main: %v", err)
-	}
-
-	// Saving
-	switch msg.TypeMessage {
-	case "I":
-		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameI)
-		_, err := db.Exec(q,
-			sql.Named("project", msg.NameProject),
-			sql.Named("location", msg.LocationEvent),
-			sql.Named("body", msg.BodyMessage))
-		if err != nil {
-			return fmt.Errorf("store a information -> flt store I: %v", err)
-		}
-	case "W":
-		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameW)
-		_, err := db.Exec(q,
-			sql.Named("project", msg.NameProject),
-			sql.Named("location", msg.LocationEvent),
-			sql.Named("body", msg.BodyMessage))
-		if err != nil {
-			return fmt.Errorf("store a information -> flt store W: %v", err)
-		}
-	case "E":
-		q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", nameE)
-		_, err := db.Exec(q,
-			sql.Named("project", msg.NameProject),
-			sql.Named("location", msg.LocationEvent),
-			sql.Named("body", msg.BodyMessage))
-		if err != nil {
-			return fmt.Errorf("store a information -> flt store E: %v", err)
-		}
-	default:
-		return errors.New("not allowed type of message")
-
 	}
 
 	return nil
