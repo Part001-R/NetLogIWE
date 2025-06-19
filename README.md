@@ -23,3 +23,4 @@ FaultForGRPC - a project that generates messages.
 
 + `v0.0.1` - Basic functionality.
 + `v0.0.2` - Fix. Working with the database through the interface.
++ `v0.0.3` - Added table overflow tracking and adding new ones.

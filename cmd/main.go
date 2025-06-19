@@ -60,10 +60,11 @@ func (s *server) SaveMessage(ctx context.Context, req *pb.MessageRequest) (*pb.M
 		return &pb.MessageResponse{Status: "Ok"}, nil
 	}
 
-	err := s.db.StoreMessage(msg)
+	err := s.db.SavingMessage(msg)
 
 	//err := db.StoreMessage(s.db, msg)
 	if err != nil {
+		fmt.Printf("error: {%v}\n", err)
 		return nil, err
 	}
 
@@ -84,7 +85,10 @@ func preparAct() (db.ActionsDB, func() error, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("fault connect DB: %v", err)
 	}
-	objDB := db.RepoDB(ptrDb)
+	objDB, err := db.RepoDB(ptrDb)
+	if err != nil {
+		log.Fatalf("an error create object instance: '%v'", err)
+	}
 
 	// Tables
 	err = objDB.Tables()

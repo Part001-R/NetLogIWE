@@ -3,6 +3,7 @@ module github.com/Part001-R/netlogiwe
 go 1.24.4
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
