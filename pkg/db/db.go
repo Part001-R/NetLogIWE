@@ -28,6 +28,30 @@ type ActionsDB interface {
 	SavingMessage(msg MessageT) error
 }
 
+// Connect DB
+func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
+
+	db, err := sql.Open("sqlite", "iwe.db")
+	if err != nil {
+		return nil, nil, fmt.Errorf("error connect DB: %v", err)
+	}
+
+	closeDB := func() error {
+		err := db.Close()
+		if err != nil {
+			return fmt.Errorf("fault close connect DB: %v", err)
+		}
+		return nil
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, nil, fmt.Errorf("fault ping DB: %v", err)
+	}
+
+	return db, closeDB, nil
+}
+
 // Create the db object. Return interface.
 func RepoDB(db *sql.DB) (ActionsDB, error) {
 	if db == nil {
@@ -107,31 +131,32 @@ func (o ObjectDB) SavingMessage(msg MessageT) error {
 	return nil
 }
 
+// =======================
+// ==      INTERNAL     ==
+// =======================
+
 // Check overload the log table
-func checkOverloadLogTable(typeTable string, lastId int64) (bool, error) {
+func checkOverloadLogTable(typeTable, maxI, maxW, maxE string, lastId int64) (bool, error) {
 
 	// read env constant
 	var maxId int64
 	switch typeTable {
 	case "I":
-		valENV := os.Getenv("MAX_IDNUMB_LOGI")
-		maxId_t, err := strconv.ParseInt(valENV, 10, 64)
+		maxId_t, err := strconv.ParseInt(maxI, 10, 64)
 		if err != nil {
 			return false, fmt.Errorf("fault parse string I: {%v}", err)
 		}
 		maxId = maxId_t
 	case "W":
-		valENV := os.Getenv("MAX_IDNUMB_LOGW")
-		maxId_t, err := strconv.ParseInt(valENV, 10, 64)
+		maxId_t, err := strconv.ParseInt(maxW, 10, 64)
 		if err != nil {
-			return false, fmt.Errorf("fault parse string I: {%v}", err)
+			return false, fmt.Errorf("fault parse string W: {%v}", err)
 		}
 		maxId = maxId_t
 	case "E":
-		valENV := os.Getenv("MAX_IDNUMB_LOGE")
-		maxId_t, err := strconv.ParseInt(valENV, 10, 64)
+		maxId_t, err := strconv.ParseInt(maxE, 10, 64)
 		if err != nil {
-			return false, fmt.Errorf("fault parse string I: {%v}", err)
+			return false, fmt.Errorf("fault parse string E: {%v}", err)
 		}
 		maxId = maxId_t
 	default:
@@ -145,8 +170,24 @@ func checkOverloadLogTable(typeTable string, lastId int64) (bool, error) {
 	return false, nil
 }
 
-// Saving rx message
+// TypeMessage
 func doSaving(db *sql.DB, tableName string, msg MessageT) (int64, error) {
+
+	if db == nil {
+		return 0, errors.New("empty pointer db")
+	}
+	if tableName == "" {
+		return 0, errors.New("empty tableName")
+	}
+	if msg.BodyMessage == "" {
+		return 0, errors.New("empty msg.BodyMessage")
+	}
+	if msg.LocationEvent == "" {
+		return 0, errors.New("empty msg.LocationEvent")
+	}
+	if msg.NameProject == "" {
+		return 0, errors.New("empty msg.NameProject")
+	}
 
 	q := fmt.Sprintf("INSERT INTO %s (nameProject, locationEvent, bodyMessage) VALUES (:project, :location, :body)", tableName)
 
@@ -173,7 +214,11 @@ func savingMessageCheckResult(db *sql.DB, nameTable string, msg MessageT) error 
 		return fmt.Errorf("fault saving {%s} message: {%v}", msg.TypeMessage, err)
 	}
 
-	over, err := checkOverloadLogTable(msg.TypeMessage, id)
+	maxI := os.Getenv("MAX_IDNUMB_LOGI")
+	maxW := os.Getenv("MAX_IDNUMB_LOGW")
+	maxE := os.Getenv("MAX_IDNUMB_LOGE")
+
+	over, err := checkOverloadLogTable(msg.TypeMessage, maxI, maxW, maxE, id)
 	if err != nil {
 		return fmt.Errorf("fault check overload {%s} table: {%v}", msg.TypeMessage, err)
 	}
@@ -186,30 +231,6 @@ func savingMessageCheckResult(db *sql.DB, nameTable string, msg MessageT) error 
 	}
 
 	return nil
-}
-
-// Connect DB
-func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
-
-	db, err := sql.Open("sqlite", "iwe.db")
-	if err != nil {
-		return nil, nil, fmt.Errorf("error connect DB: %v", err)
-	}
-
-	closeDB := func() error {
-		err := db.Close()
-		if err != nil {
-			return fmt.Errorf("fault close connect DB: %v", err)
-		}
-		return nil
-	}
-
-	err = db.Ping()
-	if err != nil {
-		return nil, nil, fmt.Errorf("fault ping DB: %v", err)
-	}
-
-	return db, closeDB, nil
 }
 
 // Check create table by name
@@ -389,29 +410,44 @@ func updateNameLogTable(db *sql.DB, newName, typeTable string) error {
 	if db == nil {
 		return errors.New("missed db pointer")
 	}
+	if newName == "" {
+		return errors.New("missed content newName")
+	}
+	if typeTable == "" {
+		return errors.New("missed content typeTable")
+	}
 
+	var resQ sql.Result
 	switch typeTable {
 	case "I":
-		_, err := db.Exec("UPDATE main SET nameTableI=? WHERE id=1", newName)
+		res, err := db.Exec("UPDATE main SET nameTableI=? WHERE id=1", newName)
 		if err != nil {
 			return fmt.Errorf("fault update the name of I table: {%v}", err)
 		}
-
+		resQ = res
 	case "W":
-		_, err := db.Exec("UPDATE main SET nameTableW=? WHERE id=1", newName)
+		res, err := db.Exec("UPDATE main SET nameTableW=? WHERE id=1", newName)
 		if err != nil {
 			return fmt.Errorf("fault update the name of W table: {%v}", err)
 		}
-
+		resQ = res
 	case "E":
-		_, err := db.Exec("UPDATE main SET nameTableE=? WHERE id=1", newName)
+		res, err := db.Exec("UPDATE main SET nameTableE=? WHERE id=1", newName)
 		if err != nil {
 			return fmt.Errorf("fault update the name of E table: {%v}", err)
 		}
-
+		resQ = res
 	default:
 		return fmt.Errorf("error in type of table. want I or W or E, recieve: {%s}", typeTable)
 	}
 
+	nChStr, err := resQ.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error get RowsAffected after update: {%v}", err)
+	}
+
+	if nChStr != 1 {
+		return errors.New("fault execution update")
+	}
 	return nil
 }
