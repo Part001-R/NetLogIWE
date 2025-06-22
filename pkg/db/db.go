@@ -28,6 +28,10 @@ type ActionsDB interface {
 	SavingMessage(msg MessageT) error
 }
 
+// =======================
+// ==       PUBLIC      ==
+// =======================
+
 // Connect DB
 func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
 
@@ -107,20 +111,24 @@ func (o ObjectDB) SavingMessage(msg MessageT) error {
 		return fmt.Errorf("fault read name of tables: {%v}", err)
 	}
 
+	maxI := os.Getenv("MAX_IDNUMB_LOGI")
+	maxW := os.Getenv("MAX_IDNUMB_LOGW")
+	maxE := os.Getenv("MAX_IDNUMB_LOGE")
+
 	// Saving the message
 	switch msg.TypeMessage {
 	case "I":
-		err := savingMessageCheckResult(o.DB, nameI, msg)
+		err := savingMessageCheckResult(o.DB, nameI, maxI, maxW, maxE, msg)
 		if err != nil {
 			return fmt.Errorf("fault save I: {%v}", err)
 		}
 	case "W":
-		err := savingMessageCheckResult(o.DB, nameW, msg)
+		err := savingMessageCheckResult(o.DB, nameW, maxI, maxW, maxE, msg)
 		if err != nil {
 			return fmt.Errorf("fault save W: {%v}", err)
 		}
 	case "E":
-		err := savingMessageCheckResult(o.DB, nameE, msg)
+		err := savingMessageCheckResult(o.DB, nameE, maxI, maxW, maxE, msg)
 		if err != nil {
 			return fmt.Errorf("fault save E: {%v}", err)
 		}
@@ -207,16 +215,12 @@ func doSaving(db *sql.DB, tableName string, msg MessageT) (int64, error) {
 }
 
 // Save message + check overload log table + update name log table + create new table
-func savingMessageCheckResult(db *sql.DB, nameTable string, msg MessageT) error {
+func savingMessageCheckResult(db *sql.DB, nameTable, maxI, maxW, maxE string, msg MessageT) error {
 
 	id, err := doSaving(db, nameTable, msg)
 	if err != nil {
 		return fmt.Errorf("fault saving {%s} message: {%v}", msg.TypeMessage, err)
 	}
-
-	maxI := os.Getenv("MAX_IDNUMB_LOGI")
-	maxW := os.Getenv("MAX_IDNUMB_LOGW")
-	maxE := os.Getenv("MAX_IDNUMB_LOGE")
 
 	over, err := checkOverloadLogTable(msg.TypeMessage, maxI, maxW, maxE, id)
 	if err != nil {
@@ -310,7 +314,7 @@ func readLogTablesName(db *sql.DB) (nameI, nameW, nameE string, err error) {
 	return nameI, nameW, nameE, nil
 }
 
-// Create tables
+// Check-create main tables
 func checkCreateMainTable(db *sql.DB) error {
 	if db == nil {
 		return errors.New("missed db pointer")
@@ -381,7 +385,7 @@ func changeLogTableNameCreate(db *sql.DB, typeTable string) error {
 	// Create new table
 	err = checkCreateLogTable(db, newName)
 	if err != nil {
-		return fmt.Errorf("fault create new table: {%s}", newName)
+		return fmt.Errorf("fault create new table {%s}: {%v}", newName, err)
 	}
 
 	return nil
