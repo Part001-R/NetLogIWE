@@ -34,7 +34,7 @@ jobs:
               working-directory: cmd
               run: go vet main.go
             - name: Lint_db
-              working-directory: pkg/api/db
+              working-directory: pkg/db
               run: go vet ./...
 
     test:

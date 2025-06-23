@@ -26,3 +26,4 @@ FaultForGRPC - a project that generates messages.
 + `v0.0.3` - Added table overflow tracking and adding new ones.
 + `v0.0.4` - Added tests (Part-1) and fix.
 + `v0.0.5` - Added tests (Part-2 SUCCESS) and fix.
++ `v0.0.6` - Dockerfile, compose, workflows, fix.
