@@ -35,9 +35,9 @@ type ActionsDB interface {
 // Connect DB
 func ConDb(typeDB, nameDB string) (*sql.DB, func() error, error) {
 
-	db, err := sql.Open("sqlite", "iwe.db")
+	db, err := sql.Open(typeDB, nameDB)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error connect DB: %v", err)
+		return nil, nil, fmt.Errorf("error connect DB: type{%s} name{%s}: %v", typeDB, nameDB, err)
 	}
 
 	closeDB := func() error {

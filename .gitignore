@@ -1,6 +1,5 @@
 .env
-sqlite3
-iwe.db
+db/iwe.db
 documentation/createSertificats
 certs/openssl.cnf
 certs/server.crt

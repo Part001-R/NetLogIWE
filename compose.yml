@@ -1,0 +1,11 @@
+
+services:
+  netlog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "50200:50200"
+    volumes:
+      - /home/user/db:/app/db
+

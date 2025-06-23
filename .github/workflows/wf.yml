@@ -1,0 +1,65 @@
+name: wf
+
+on:
+    push:
+        branches: [main]
+    pull_request: 
+        branches: [main]
+
+jobs:
+    build_netlog:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: 1.24
+            - name: Checkout
+              uses: actions/Checkout@v4
+            - name: Build
+              working-directory: cmd
+              run: go build -v -o netlogiwe main.go
+    
+    lint_netlog:
+        needs: build_netlog
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: 1.24
+            - name: Checkout
+              uses: actions/Checkout@v4
+            - name: Lint_main
+              working-directory: cmd
+              run: go vet main.go
+            - name: Lint_db
+              working-directory: pkg/api/db
+              run: go vet ./...
+
+    test:
+        needs: lint_netlog
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: 1.24
+            - name: Checkout
+              uses: actions/Checkout@v4
+            - name: Test
+              run: go test -v ./...
+
+    test_race:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - name: Install Go
+              uses: actions/setup-go@v5
+              with:
+                go-version: 1.24
+            - name: Checkout
+              uses: actions/Checkout@v4
+            - name: Test
+              run: go test -race -v ./...
+
